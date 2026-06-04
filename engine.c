@@ -106,21 +106,39 @@ static void fake_rotate (shape_t *shape,bool clockwise)
 static void drawshape (board_t board,shape_t *shape,int x,int y)
 {
    int i;
-   for (i = 0; i < NUMBLOCKS; i++) board[x + shape->block[i].x][y + shape->block[i].y] = shape->color;
+   for (i = 0; i < NUMBLOCKS; i++)
+     {
+        int bx = x + shape->block[i].x;
+        int by = y + shape->block[i].y;
+        if (bx >= 0 && bx < NUMCOLS && by >= 0 && by < NUMROWS)
+           board[bx][by] = shape->color;
+     }
 }
 
 /* Erase a shape from the board */
 static void eraseshape (board_t board,shape_t *shape,int x,int y)
 {
    int i;
-   for (i = 0; i < NUMBLOCKS; i++) board[x + shape->block[i].x][y + shape->block[i].y] = COLOR_BLACK;
+   for (i = 0; i < NUMBLOCKS; i++)
+     {
+        int bx = x + shape->block[i].x;
+        int by = y + shape->block[i].y;
+        if (bx >= 0 && bx < NUMCOLS && by >= 0 && by < NUMROWS)
+           board[bx][by] = COLOR_BLACK;
+     }
 }
 
 /* Check if shape is allowed to be in this position */
 static bool allowed (board_t board,shape_t *shape,int x,int y)
 {
    int i,occupied = FALSE;
-   for (i = 0; i < NUMBLOCKS; i++) if (board[x + shape->block[i].x][y + shape->block[i].y]) occupied = TRUE;
+   for (i = 0; i < NUMBLOCKS; i++)
+     {
+        int bx = x + shape->block[i].x;
+        int by = y + shape->block[i].y;
+        if (bx < 0 || bx >= NUMCOLS || by < 0 || by >= NUMROWS) return FALSE;
+        if (board[bx][by]) occupied = TRUE;
+     }
    return (!occupied);
 }
 
@@ -238,13 +256,14 @@ static int shape_drop (engine_t *engine)
 {
    board_t *board = &engine->board;
    shape_t *shape = &engine->shapes[engine->curshape];
-   eraseshape (*board,shape,engine->curx,engine->cury);
    int droppedlines = 0;
+   eraseshape (*board,shape,engine->curx,engine->cury);
 
    if (engine->shadow) {
-       drawshape (*board,shape,engine->curx_shadow,engine->cury_shadow);
+       eraseshape (*board,shape,engine->curx_shadow,engine->cury_shadow);
        droppedlines = engine->cury_shadow - engine->cury;
        engine->cury = engine->cury_shadow;
+       drawshape (*board,shape,engine->curx,engine->cury);
        return droppedlines;
    }
 
@@ -287,6 +306,7 @@ static int droplines (board_t board)
 /* shuffle int array */
 void shuffle (int *array, size_t n)
 {
+   if (n <= 1) return;
    size_t i;
    for (i = 0; i < n - 1; i++)
    {
@@ -384,7 +404,7 @@ int engine_evaluate (engine_t *engine)
 		engine->curx_shadow -= 5;
 		engine->curx_shadow = abs (engine->curx_shadow);
 		engine->status.rotations = 4 - engine->status.rotations;
-		engine->status.rotations = engine->status.rotations > 0 ? 0 : engine->status.rotations;
+		engine->status.rotations = engine->status.rotations < 0 ? 0 : engine->status.rotations;
 		engine->status.efficiency += engine->status.dropcount + engine->status.rotations + (engine->curx - engine->status.moves);
 		engine->status.efficiency >>= 1;
 		engine->status.dropcount = engine->status.rotations = engine->status.moves = 0;
@@ -400,8 +420,15 @@ int engine_evaluate (engine_t *engine)
 		engine->bag_iterator++;
 		/* initialize shapes */
 		memcpy (engine->shapes,SHAPES,sizeof (shapes_t));
-		/* return games status */
-		return allowed (engine->board,&engine->shapes[engine->curshape],engine->curx,engine->cury) ? 0 : -1;
+		/* draw new piece and shadow, return game status */
+		if (!allowed (engine->board,&engine->shapes[engine->curshape],engine->curx,engine->cury)) return -1;
+		if (engine->shadow)
+		  {
+			 place_shadow_to_bottom (engine->board,&engine->shapes[engine->curshape],engine->curx_shadow,&engine->cury_shadow,engine->cury);
+			 drawshape (engine->board,&engine->shapes[engine->curshape],engine->curx_shadow,engine->cury_shadow);
+		  }
+		drawshape (engine->board,&engine->shapes[engine->curshape],engine->curx,engine->cury);
+		return 0;
 	 }
    shape_down (engine);
    return 1;
