@@ -10,7 +10,7 @@ make clean    # remove object files and binary
 ./tint -s -n  # run with shadow and next-piece preview
 ```
 
-There is no test suite; correctness must be verified by playing the game.
+Run the engine unit tests with `make test`; they exercise board initialisation, movement, line clearing, the 7-bag randomiser, shadow tracking, game-over detection, and `str2int`. No external framework required.
 
 Options: `-l <1-9>` starting level, `-n` show next piece, `-d` dotted grid, `-s` shadow, `-b <char>` block character.
 

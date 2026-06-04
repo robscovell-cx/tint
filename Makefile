@@ -52,7 +52,9 @@ PRG = tint
 
        ########### NOTHING TO EDIT BELOW THIS ###########
 
-.PHONY: all clean do-it-all depend with-depends without-depends debian
+TEST_PRG = tests/test_engine
+
+.PHONY: all clean test do-it-all depend with-depends without-depends debian
 
 all: do-it-all
 
@@ -74,8 +76,12 @@ with-depends: $(PRG)
 $(PRG): $(OBJ)
 	$(CROSS)$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS)
 
+test: engine.c utils.c tests/test_engine.c tests/io.h
+	$(CC) $(CFLAGS) -include tests/io.h -I . -o $(TEST_PRG) tests/test_engine.c engine.c utils.c
+	./$(TEST_PRG)
+
 clean:
-	rm -f .depends *~ $(OBJ) $(PRG) {configure,build}-stamp gmon.out a.out
+	rm -f .depends *~ $(OBJ) $(PRG) $(TEST_PRG) {configure,build}-stamp gmon.out a.out
 
 distclean: clean
 
