@@ -82,7 +82,7 @@ typedef struct engine_struct
    bool shadow;                                     /* show shadow */
    int curx,cury,curx_shadow,cury_shadow;			/* coordinates of current piece */
    int curshape,nextshape;							/* current & next shapes */
-   int score;										/* score */
+   long score;									/* score */
    int bag_iterator;								/* iterator for randomized bag */
    int bag[NUMSHAPES];								/* pointer to bag of shapes */
    shapes_t shapes;									/* shapes */

@@ -196,7 +196,7 @@ static void showstatus (engine_t *engine)
    out_gotoxy (2,YTOP + 4);   out_printf ("Score");
    out_setattr (ATTR_BOLD);
    out_setcolor (COLOR_YELLOW,COLOR_BLACK);
-   out_printf ("  %d",GETSCORE (engine->score));
+   out_printf ("  %ld",GETSCORE (engine->score));
    if (shownext) drawnext (engine->nextshape,3,YTOP + 22);
    out_setattr (ATTR_OFF);
    out_setcolor (COLOR_WHITE,COLOR_BLACK);
@@ -290,7 +290,7 @@ static void showstatus (engine_t *engine)
    for (i = 0; i < MAXDIGITS + 16; i++) out_putch (' ');
    out_gotoxy (out_width () - MAXDIGITS - 17,YTOP + 20);
    out_printf ("Score ratio  :");
-   snprintf (tmp,MAXDIGITS + 1,"%d",GETSCORE (engine->score) / sum);
+   snprintf (tmp,MAXDIGITS + 1,"%ld",sum > 0 ? GETSCORE (engine->score) / sum : 0);
    out_gotoxy (out_width () - strlen (tmp) - 1,YTOP + 20);
    out_printf ("%s",tmp);
    out_gotoxy (out_width () - MAXDIGITS - 17,YTOP + 21);
@@ -333,7 +333,9 @@ static void getname (char *name)
    fprintf (stderr,"Enter your name [%s]: ",pw != NULL ? pw->pw_name : "");
 
    fgets (name,NAMELEN - 1,stdin);
-   name[strlen (name) - 1] = '\0';
+   size_t namelen = strlen (name);
+   if (namelen > 0 && name[namelen - 1] == '\n') name[--namelen] = '\0';
+   if (namelen > 0 && name[namelen - 1] == '\r') name[--namelen] = '\0';
 
    if (!strlen (name) && pw != NULL)
 	 {
@@ -356,15 +358,17 @@ static void err2 ()
 
 void showplayerstats (engine_t *engine)
 {
+   int sum = getsum ();
    fprintf (stderr,
 			"\n\t   PLAYER STATISTICS\n\n\t"
-			"Score       %11d\n\t"
+			"Score       %11ld\n\t"
 			"Efficiency  %11d\n\t"
-			"Score ratio %11d\n",
-			GETSCORE (engine->score),engine->status.efficiency,GETSCORE (engine->score) / getsum ());
+			"Score ratio %11ld\n",
+			GETSCORE (engine->score),engine->status.efficiency,
+			sum > 0 ? GETSCORE (engine->score) / sum : 0);
 }
 
-static void createscores (int score)
+static void createscores (long score)
 {
    FILE *handle;
    int i,j;
@@ -378,7 +382,7 @@ static void createscores (int score)
 		scores[i].timestamp = 0;
 	 }
    getname (scores[0].name);
-   scores[0].score = score;
+   scores[0].score = (int)score;
    scores[0].timestamp = time (NULL);
    if ((handle = fopen (scorefile,"w")) == NULL) err1 ();
    strcpy (header,SCORE_HEADER);
@@ -396,7 +400,7 @@ static void createscores (int score)
    fclose (handle);
 
    fprintf (stderr,"%s",scoretitle);
-   fprintf (stderr,"\t  1* %7d        %s\n\n",score,scores[0].name);
+   fprintf (stderr,"\t  1* %7ld        %s\n\n",score,scores[0].name);
 }
 
 static int cmpscores (const void *a,const void *b)
@@ -408,16 +412,19 @@ static int cmpscores (const void *a,const void *b)
    /* a > b */
    if (result > 0) return -1;
    /* a = b */
-   result = (time_t) ((score_t *) a)->timestamp - (time_t) ((score_t *) b)->timestamp;
-   /* a is older */
-   if (result < 0) return -1;
-   /* b is older */
-   if (result > 0) return 1;
+   {
+      time_t ta = ((score_t *) a)->timestamp;
+      time_t tb = ((score_t *) b)->timestamp;
+      /* a is older */
+      if (ta < tb) return -1;
+      /* b is older */
+      if (ta > tb) return 1;
+   }
    /* timestamps is equal */
    return 0;
 }
 
-static void savescores (int score)
+static void savescores (long score)
 {
    FILE *handle;
    int i,j,ch;
@@ -465,7 +472,7 @@ static void savescores (int score)
    if (score > scores[NUMSCORES - 1].score)
 	 {
 		getname (scores[NUMSCORES - 1].name);
-		scores[NUMSCORES - 1].score = score;
+		scores[NUMSCORES - 1].score = (int)score;
 		scores[NUMSCORES - 1].timestamp = tmp = time (NULL);
 	 }
    qsort (scores,NUMSCORES,sizeof (score_t),cmpscores);
@@ -560,7 +567,9 @@ static void choose_level ()
 	 {
 		fprintf (stderr,"Choose a level to start [%d-%d]: ",MINLEVEL,MAXLEVEL);
 		fgets (buf,NAMELEN - 1,stdin);
-		buf[strlen (buf) - 1] = '\0';
+		size_t buflen = strlen (buf);
+		if (buflen > 0 && buf[buflen - 1] == '\n') buf[--buflen] = '\0';
+		if (buflen > 0 && buf[buflen - 1] == '\r') buf[--buflen] = '\0';
 	 }
    while (!str2int (&level,buf) || level < MINLEVEL || level > MAXLEVEL);
 }
