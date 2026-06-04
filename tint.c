@@ -45,7 +45,9 @@
  * Macros
  */
 
-/* Upper left corner of board */
+/* Upper left corner of board — shifted right by sidebar width, centered vertically.
+ * The constants 3 and 9 account for the border columns and the sidebar rows above/below
+ * the play area; >> 1 divides by 2 for centering. */
 #define XTOP ((out_width () - NUMROWS - 3) >> 1)
 #define YTOP ((out_height () - NUMCOLS - 9) >> 1)
 
@@ -60,7 +62,9 @@
 /* This calculates the time allowed to move a shape, before it is moved a row down */
 #define DELAY (1000000 / (level + 2))
 
-/* The score is multiplied by this to avoid losing precision */
+/* The score is multiplied by this to avoid losing precision when halving:
+ * showing-next and dotted-lines both divide the raw score by 2, so storing
+ * values pre-multiplied by 2 keeps the intermediate arithmetic exact. */
 #define SCOREFACTOR 2
 
 /* This calculates the stored score value */
@@ -73,6 +77,8 @@ static bool shownext;
 static bool dottedlines;
 static bool shadow;
 static int level = MINLEVEL - 1,shapecount[NUMSHAPES];
+/* Each cell is drawn as two characters side-by-side so it appears square in a
+ * fixed-width terminal; the default space pair gives a solid colored block. */
 static char blockchar = ' ';
 
 /*
@@ -86,6 +92,7 @@ static void score_function (engine_t *engine)
    int score = SCOREVAL (level * (engine->status.dropcount + 1));
    score += SCOREVAL ((level + 10) * engine->status.currentdroppedlines * engine->status.currentdroppedlines);
 
+   /* Both options make the game easier, so they carry a scoring penalty. */
    if (shownext) score /= 2;
    if (dottedlines) score /= 2;
 
@@ -139,6 +146,8 @@ static void drawboard (board_t board)
 static void drawnext (int shapenum,int x,int y)
 {
    int i;
+   /* Per-shape (x,y) pixel offsets that visually center each piece in the
+    * preview box — they differ because shapes have different bounding boxes. */
    block_t ofs[NUMSHAPES] =
 	 { { 1,  0 }, { 1,  0 }, { 1, -1 }, { 2,  0 }, { 1, -1 }, { 1, -1 }, { 0, -1 } };
    out_setcolor (COLOR_BLACK,COLOR_BLACK);
@@ -186,6 +195,9 @@ static int getsum ()
 /* This show the current status of the game */
 static void showstatus (engine_t *engine)
 {
+   /* Maps the visual top-to-bottom display order of shapes in the statistics
+    * panel to their internal SHAPES[] indices — the panel layout doesn't match
+    * the engine's shape numbering. */
    static const int shapenum[NUMSHAPES] = { 4, 6, 5, 1, 0, 3, 2 };
    char tmp[MAXDIGITS + 1];
    int i,sum = getsum ();
@@ -403,6 +415,9 @@ static void createscores (long score)
    fprintf (stderr,"\t  1* %7ld        %s\n\n",score,scores[0].name);
 }
 
+/* Comparator for qsort: descending by score (higher is better).
+ * Equal scores are broken by timestamp: the earlier (older) entry ranks
+ * higher so that a newly entered score doesn't displace an existing equal one. */
 static int cmpscores (const void *a,const void *b)
 {
    int result;
@@ -430,6 +445,8 @@ static void savescores (long score)
    int i,j,ch;
    score_t scores[NUMSCORES];
    char header[strlen (SCORE_HEADER)+1];
+   /* tmp records the timestamp of the newly entered score (0 if no new entry),
+    * so it can be marked with '*' when the table is printed. */
    time_t tmp = 0;
    if ((handle = fopen (scorefile,"r")) == NULL)
 	 {
@@ -586,6 +603,7 @@ static bool evaluate (engine_t *engine)
             break;
             /* shape at bottom, next one released */
         case 0:
+            /* Level up every 10 completed lines, up to MAXLEVEL. */
             if ((level < MAXLEVEL) && ((engine->status.droppedlines / 10) > level))
             {
                 level++;
@@ -691,7 +709,8 @@ int main (int argc,char *argv[])
 				default:
 				  out_beep ();
 			   }
-			 in_flush ();
+			 /* Discard any keys that queued while we were processing this one. */
+		 in_flush ();
 		  }
 		else
 		  finished = evaluate(&engine);
