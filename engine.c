@@ -84,6 +84,9 @@ static void fake_rotate (shape_t *shape,bool clockwise)
    switch (shape->type)
 	 {
 	  case 0:	/* Just rotate this one anti-clockwise and clockwise */
+		/* Types 0, 1, 6 have only two meaningful orientations, so they toggle
+		 * between states regardless of the requested direction. `clockwise` is
+		 * intentionally ignored for these types. */
 		if (shape->flipped) real_rotate (shape,TRUE); else real_rotate (shape,FALSE);
 		shape->flipped = !shape->flipped;
 		break;
@@ -101,6 +104,12 @@ static void fake_rotate (shape_t *shape,bool clockwise)
 		break;
 	 }
 }
+
+/* Shadow and piece share the same color value on the board, so the renderer
+ * must use curx_shadow/cury_shadow coordinates to render them differently.
+ * Every movement function erases BOTH piece and shadow before testing a new
+ * position; leaving either drawn would cause allowed() to treat it as an
+ * obstacle and block movement. */
 
 /* Draw a shape on the board */
 static void drawshape (board_t board,shape_t *shape,int x,int y)
@@ -143,6 +152,8 @@ static bool allowed (board_t board,shape_t *shape,int x,int y)
 }
 
 /* Set y coordinate of shadow */
+/* Always starts from the piece's current y, not the old shadow y, so the
+ * shadow always reflects the true drop destination after any move. */
 static void place_shadow_to_bottom (board_t board,shape_t *shape,int x_shadow,int *y_shadow,int y) {
    while (allowed(board,shape,x_shadow,y+1)) y++;
    *y_shadow = y;
@@ -304,6 +315,9 @@ static int droplines (board_t board)
 }
 
 /* shuffle int array */
+/* Used to implement 7-bag randomization: each of the 7 pieces appears exactly
+ * once per cycle. The bag is reshuffled just before the iterator wraps so that
+ * nextshape already shows the correct first piece of the upcoming cycle. */
 void shuffle (int *array, size_t n)
 {
    if (n <= 1) return;
@@ -399,6 +413,8 @@ int engine_evaluate (engine_t *engine)
 		engine->status.currentdroppedlines = dropped_lines;
 		/* increase score */
 		engine->score_function (engine);
+		/* curx starts at 5 (spawn column); subtracting 5 and taking abs gives
+		 * horizontal distance from spawn, used as a proxy for lateral effort. */
 		engine->curx -= 5;
 		engine->curx = abs (engine->curx);
 		engine->curx_shadow -= 5;
