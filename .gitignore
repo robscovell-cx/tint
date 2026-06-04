@@ -1,0 +1,9 @@
+# Build outputs
+tint
+*.o
+.depends
+
+# Misc
+*~
+gmon.out
+a.out
